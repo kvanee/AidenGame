@@ -1,0 +1,25 @@
+{
+  "name": "aidengame",
+  "version": "1.0.0",
+  "description": "aidens first game ",
+  "main": "app.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/kvanee/AidenGame.git"
+  },
+  "author": "aiden vanee",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/kvanee/AidenGame/issues"
+  },
+  "homepage": "https://github.com/kvanee/AidenGame#readme",
+  "dependencies": {
+    "express": "^4.16.1",
+    "phaser-ce": "^2.8.8",
+    "pug": "^2.0.0-rc.4",
+    "socket.io": "^2.0.3"
+  }
+}
