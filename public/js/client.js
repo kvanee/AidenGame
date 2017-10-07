@@ -34,7 +34,7 @@ function onsocketConnected () {
 }
 
 function onRemovePlayer (data) {
-	var removePlayer = findplayerbyid(data.id);
+	var removePlayer = enemies[data.id];
 	// Player not found
 	if (!removePlayer) {
 		console.log('Player not found: ', data.id)
@@ -42,7 +42,7 @@ function onRemovePlayer (data) {
 	}
 	
 	removePlayer.player.destroy();
-	enemies.splice(enemies.indexOf(removePlayer), 1);
+	delete enemies[data.id];
 }
 
 function createPlayer () {
@@ -101,19 +101,19 @@ function onNewPlayer (data) {
 
 //Server tells us there is a new enemy movement. We find the moved enemy
 //and sync the enemy movement with the server
-function onEnemyMove (data) {
-	var movePlayer = enemies[data.id]; 
-	
-	if (!movePlayer) {
-		return;
+function onUpdatePlayerPositions (data) {
+	for (var key in data) {
+		var element = data[key];
+		var movePlayer = enemies[element.id]; 
+		
+		if (movePlayer) {
+			var distance = Phaser.Math.distance(movePlayer.player.body.x,movePlayer.player.body.y,element.x,element.y);
+			var duration = distance*10;
+			var tween = game.add.tween(movePlayer.player);
+			tween.to({x:element.x,y:element.y}, 1);
+			tween.start();
+		}
 	}
-	movePlayer.x = data.x; 
-	movePlayer.y = data.y; 
-	movePlayer.angle = data.angle; 
-	var distance = Phaser.Math.distance(movePlayer.player.x,movePlayer.player.y,data.x, data.y);
-	console.log("distance: " + distance);
-	if(distance > 10)
-		game.physics.arcade.moveToXY(movePlayer.player, movePlayer.x, movePlayer.y, playerProperties.speed);
 }
 
 // add the 
@@ -145,8 +145,9 @@ main.prototype = {
 
 		//listen to new enemy connections
 		socket.on("new_enemyPlayer", onNewPlayer);
+		
 		//listen to enemy movement 
-		socket.on("enemy_move", onEnemyMove);
+		socket.on("update_player_positions", onUpdatePlayerPositions);
 		
 		// when received remove_player, remove the player passed; 
 		socket.on('remove_player', onRemovePlayer);
@@ -160,15 +161,16 @@ main.prototype = {
 			if (game.physics.arcade.distanceToPointer(player, pointer) <= 50)
 				player.body.velocity.setTo(0, 0);
 			
-			else
+			else {
 				game.physics.arcade.moveToPointer(player, playerProperties.speed);
+				socket.emit('move_player', {x: player.x, y: player.y, angle: player.angle});
+			}
 			
 		}
 		else
 		{
 			player.body.velocity.setTo(0, 0);
 		}
-		socket.emit('move_player', {x: player.x, y: player.y, angle: player.angle});
 	}
 }
 

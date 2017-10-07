@@ -20,13 +20,15 @@ http.listen(port, function () {
 
 //this is where we will store all the players in the client,
 // which is connected to the server
-var player_lst = [];
+var players = {};
+var dirty = false;
 
 // A player “class”, which will be stored inside player list 
-var Player = function (startX, startY, startAngle) {
-  var x = startX
-  var y = startY
-  var angle = startAngle
+var Player = function (id, startX, startY, startAngle) {
+  this.id = id;
+  this.x = startX
+  this.y = startY
+  this.angle = startAngle
 }
 
 //onNewplayer function is called whenever a server gets a message “new_player” from the client
@@ -35,21 +37,13 @@ var Player = function (startX, startY, startAngle) {
 function onNewplayer (data) {
 	console.log(data);
 	//new player instance
-	var newPlayer = new Player(data.x, data.y, data.angle);
+	var newPlayer = new Player(this.id, data.x, data.y, data.angle);
 	console.log(newPlayer);
 	console.log("created new player with id " + this.id);
-	newPlayer.id = this.id; 	
-	//information to be sent to all clients except sender
-	var current_info = {
-		id: newPlayer.id, 
-		x: newPlayer.x,
-		y: newPlayer.y,
-		angle: newPlayer.angle,
-	}; 
 	
 	//send to the new player about everyone who is already connected. 	
-	for (i = 0; i < player_lst.length; i++) {
-		existingPlayer = player_lst[i];
+	for (var key in players) {
+		existingPlayer = players[key];
 		var player_info = {
 			id: existingPlayer.id,
 			x: existingPlayer.x,
@@ -58,62 +52,39 @@ function onNewplayer (data) {
 		};
 		console.log("pushing player");
 		//send message to the sender-client only
-		this.emit("new_enemyPlayer", player_info);
+		this.emit("new_enemyPlayer", existingPlayer);
 	}
 	
 	//send message to every connected client except the sender
-	this.broadcast.emit('new_enemyPlayer', current_info);
-	player_lst.push(newPlayer); 
+	this.broadcast.emit('new_enemyPlayer', newPlayer);
+	players[newPlayer.id] = newPlayer; 
 }
 
 //update the player position and send the information back to every client except sender
 function onMovePlayer (data) {
-	
-	var movePlayer = find_playerid(this.id); 
-	movePlayer.x = data.x;
-	movePlayer.y = data.y;
-	movePlayer.angle = data.angle; 
-	
-	var moveplayerData = {
-		id: movePlayer.id,
-		x: movePlayer.x,
-		y: movePlayer.y, 
-		angle: movePlayer.angle
+	dirty = true;
+	players[this.id] = new Player(this.id, data.x, data.y, data.angle);
+}
+
+function updatePlayerPositions(){
+	if(dirty) {
+		dirty = false;
+		//send message to every connected client except the sender
+		io.emit('update_player_positions', players);
 	}
-	console.log('move player:' + JSON.stringify(moveplayerData)); 
-	//send message to every connected client except the sender
-	this.broadcast.emit('enemy_move', moveplayerData);
 }
 
 //call when a client disconnects and tell the clients except sender to remove the disconnected player
 function onClientdisconnect() {
 	console.log('disconnect'); 
 
-	var removePlayer = find_playerid(this.id); 
-		
-	if (removePlayer) {
-		player_lst.splice(player_lst.indexOf(removePlayer), 1);
-	}
+	delete players[this.id]; 
 	
-	console.log("removing player " + this.id);
-	
+	console.log("removing player " + this.id);	
 	//send message to every connected client except the sender
 	this.broadcast.emit('remove_player', {id: this.id});
 	
 }
-
-// find player by the the unique socket id 
-function find_playerid(id) {
-	
-		for (var i = 0; i < player_lst.length; i++) {
-	
-			if (player_lst[i].id == id) {
-				return player_lst[i]; 
-			}
-		}
-		
-		return false; 
-	}
 
 // listen for a connection request from any client
 io.sockets.on('connection', function(socket){
@@ -124,6 +95,9 @@ io.sockets.on('connection', function(socket){
 	
 	// listen for new player
 	socket.on("new_player", onNewplayer);
+	
 	// listen for player position update
 	socket.on("move_player", onMovePlayer);
 });
+
+setInterval(updatePlayerPositions, 50)
